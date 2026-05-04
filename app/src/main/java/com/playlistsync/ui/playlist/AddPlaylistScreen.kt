@@ -84,6 +84,8 @@ fun AddPlaylistScreen(
                 PreviewSection(
                     preview = uiState as AddPlaylistUiState.Preview,
                     onSyncModeChange = { viewModel.setSyncMode(it) },
+                    onAudioFormatChange = { viewModel.setAudioFormat(it) },
+                    onVideoQualityChange = { viewModel.setVideoQuality(it) },
                     onSave = { viewModel.savePlaylist() }
                 )
             }
@@ -91,10 +93,13 @@ fun AddPlaylistScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PreviewSection(
     preview: AddPlaylistUiState.Preview,
     onSyncModeChange: (String) -> Unit,
+    onAudioFormatChange: (String) -> Unit,
+    onVideoQualityChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -132,10 +137,57 @@ private fun PreviewSection(
         )
     }
 
+    if (preview.syncMode == "audio") {
+        FormatDropdown(
+            label = "Audio format",
+            options = listOf("m4a", "mp3", "opus", "flac", "wav"),
+            selected = preview.audioFormat,
+            onSelected = onAudioFormatChange
+        )
+    } else {
+        FormatDropdown(
+            label = "Video quality",
+            options = listOf("best", "1080p", "720p", "480p", "360p"),
+            selected = preview.videoQuality,
+            onSelected = onVideoQualityChange
+        )
+    }
+
     Button(
         onClick = onSave,
         modifier = Modifier.fillMaxWidth()
     ) {
         Text("Add Playlist")
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormatDropdown(
+    label: String,
+    options: List<String>,
+    selected: String,
+    onSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selected,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.uppercase()) },
+                    onClick = { onSelected(option); expanded = false }
+                )
+            }
+        }
     }
 }

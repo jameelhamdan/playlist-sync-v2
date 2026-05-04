@@ -93,7 +93,7 @@ private fun FormatSection(config: PlaylistConfig, onUpdate: (PlaylistConfig) -> 
         Spacer(Modifier.height(4.dp))
         DropdownSetting(
             label = "Quality",
-            options = listOf("best", "1080", "720", "480"),
+            options = listOf("best", "1080p", "720p", "480p", "360p"),
             selected = config.qualityPreset,
             onSelected = { onUpdate(config.copy(qualityPreset = it)) }
         )

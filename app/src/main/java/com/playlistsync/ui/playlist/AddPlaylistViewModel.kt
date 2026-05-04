@@ -29,7 +29,9 @@ sealed interface AddPlaylistUiState {
         val name: String,
         val videoCount: Int,
         val channelName: String,
-        val syncMode: String = "audio"
+        val syncMode: String = "audio",
+        val audioFormat: String = "m4a",
+        val videoQuality: String = "best"
     ) : AddPlaylistUiState
     data class Error(val message: String) : AddPlaylistUiState
     object Saved   : AddPlaylistUiState
@@ -73,7 +75,9 @@ class AddPlaylistViewModel @Inject constructor(
                     name = meta.title,
                     videoCount = meta.entries.size,
                     channelName = meta.channelName,
-                    syncMode = settings.defaultSyncMode
+                    syncMode = settings.defaultSyncMode,
+                    audioFormat = settings.defaultAudioFormat,
+                    videoQuality = settings.defaultVideoQuality
                 )
             } catch (e: Exception) {
                 _uiState.value = AddPlaylistUiState.Error(
@@ -86,6 +90,16 @@ class AddPlaylistViewModel @Inject constructor(
     fun setSyncMode(mode: String) {
         val current = _uiState.value as? AddPlaylistUiState.Preview ?: return
         _uiState.value = current.copy(syncMode = mode)
+    }
+
+    fun setAudioFormat(format: String) {
+        val current = _uiState.value as? AddPlaylistUiState.Preview ?: return
+        _uiState.value = current.copy(audioFormat = format)
+    }
+
+    fun setVideoQuality(quality: String) {
+        val current = _uiState.value as? AddPlaylistUiState.Preview ?: return
+        _uiState.value = current.copy(videoQuality = quality)
     }
 
     fun savePlaylist() {
@@ -103,8 +117,8 @@ class AddPlaylistViewModel @Inject constructor(
                 videoCount = meta.entries.size,
                 config = PlaylistConfig(
                     syncMode = preview.syncMode,
-                    audioFormat = settings.defaultAudioFormat,
-                    qualityPreset = settings.defaultVideoQuality,
+                    audioFormat = preview.audioFormat,
+                    qualityPreset = preview.videoQuality,
                     embedThumbnail = settings.defaultEmbedThumbnail,
                     maxConcurrentDownloads = settings.defaultConcurrentDownloads,
                     proxyUrl = settings.defaultProxyUrl

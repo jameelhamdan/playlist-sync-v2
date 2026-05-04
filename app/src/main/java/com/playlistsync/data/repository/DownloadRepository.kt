@@ -86,6 +86,9 @@ class DownloadRepository @Inject constructor() {
         outputDir: File,
         config: PlaylistConfig,
         processId: String,
+        playlistName: String = "",
+        channelName: String = "",
+        trackNumber: Int = 0,
         onProgress: (Int, Long) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val formatString = buildFormatString(config)
@@ -108,8 +111,18 @@ class DownloadRepository @Inject constructor() {
                 addOption("-x")
                 addOption("--audio-format", config.audioFormat)
                 addOption("--audio-quality", "0")
-                if (config.embedThumbnail) addOption("--embed-thumbnail")
+                // m4a/opus/flac/wav all support thumbnail embedding via mutagen (no AtomicParsley needed)
+                if (config.embedThumbnail && config.audioFormat in listOf("m4a", "opus", "flac", "wav")) {
+                    addOption("--embed-thumbnail")
+                }
                 addOption("--add-metadata")
+                // Map yt-dlp's uploader field → artist tag (--add-metadata does title/date but
+                // doesn't always populate artist/album when downloading individual video URLs)
+                addOption("--parse-metadata", "%(uploader)s:%(meta_artist)s")
+                // Set album, album_artist, and track via ffmpeg postprocessor args
+                buildAudioMetadataArgs(channelName, playlistName, trackNumber)?.let { args ->
+                    addOption("--postprocessor-args", args)
+                }
             } else {
                 addOption("--merge-output-format", config.videoContainer)
                 if (config.embedSubs) {
@@ -154,16 +167,36 @@ class DownloadRepository @Inject constructor() {
                 ?: YoutubeDL.UpdateStatus.ALREADY_UP_TO_DATE
         }
 
+    // yt-dlp parses --postprocessor-args with shlex, so values with spaces need single-quoting.
+    // We strip single-quotes from names to avoid escaping complexity.
+    private fun buildAudioMetadataArgs(channelName: String, playlistName: String, trackNumber: Int): String? {
+        val parts = mutableListOf<String>()
+        if (channelName.isNotBlank()) {
+            val safe = channelName.replace("'", "")
+            parts += "-metadata 'album_artist=$safe'"
+        }
+        if (playlistName.isNotBlank()) {
+            val safe = playlistName.replace("'", "")
+            parts += "-metadata 'album=$safe'"
+        }
+        if (trackNumber > 0) parts += "-metadata track=$trackNumber"
+        return if (parts.isEmpty()) null else "ffmpeg:${parts.joinToString(" ")}"
+    }
+
     private fun buildFormatString(config: PlaylistConfig): String {
         if (config.formatString.isNotBlank()) return config.formatString
         return if (config.syncMode == "audio") {
-            "bestaudio[ext=m4a]/bestaudio"
+            // No ext restriction — let -x + --audio-format convert to the desired codec.
+            // Restricting to [ext=m4a] fails when YouTube only serves opus/webm streams.
+            "bestaudio/best"
         } else {
-            when (config.qualityPreset) {
-                "1080" -> "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]"
-                "720"  -> "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]"
-                "480"  -> "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]"
-                else   -> "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+            val h = config.qualityPreset.removeSuffix("p")
+            when (h) {
+                "1080" -> "bestvideo[height<=1080]+bestaudio/bestvideo[height<=1080]/best[height<=1080]/best"
+                "720"  -> "bestvideo[height<=720]+bestaudio/bestvideo[height<=720]/best[height<=720]/best"
+                "480"  -> "bestvideo[height<=480]+bestaudio/bestvideo[height<=480]/best[height<=480]/best"
+                "360"  -> "bestvideo[height<=360]+bestaudio/bestvideo[height<=360]/best[height<=360]/best"
+                else   -> "bestvideo+bestaudio/best"
             }
         }
     }

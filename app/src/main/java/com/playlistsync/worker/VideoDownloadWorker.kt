@@ -38,9 +38,10 @@ class VideoDownloadWorker @AssistedInject constructor(
 
         setForeground(buildForegroundInfo("Downloading: ${video.title}", 0))
 
+        val settings = appSettingsRepository.getSettings()
         val outputDir = File(
             applicationContext.getExternalFilesDir(null),
-            "playlists/${playlist.id}"
+            "${settings.downloadDirName}/${playlist.id}"
         ).also { it.mkdirs() }
 
         val processId = "download_${video.id}"
@@ -51,6 +52,9 @@ class VideoDownloadWorker @AssistedInject constructor(
                 outputDir = outputDir,
                 config = playlist.config,
                 processId = processId,
+                playlistName = playlist.name,
+                channelName = playlist.channelName,
+                trackNumber = video.playlistIndex + 1,
                 onProgress = { percent, _ ->
                     kotlinx.coroutines.runBlocking {
                         playlistRepository.updateVideoDownloadState(

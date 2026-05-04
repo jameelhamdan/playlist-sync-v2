@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,6 +23,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val s by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -125,6 +128,37 @@ fun SettingsScreen(
                 placeholder = { Text("http://host:port  or  socks5://host:port") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
+            )
+
+            Spacer(Modifier.height(8.dp))
+            SectionHeader("Storage")
+
+            val resolvedPath = remember(s.downloadDirName) {
+                "${context.getExternalFilesDir(null)?.absolutePath}/${s.downloadDirName}"
+            }
+            OutlinedTextField(
+                value = s.downloadDirName,
+                onValueChange = { v ->
+                    if (v.none { it == '/' || it == '\\' || it == ':' })
+                        viewModel.update { it.copy(downloadDirName = v.trimStart()) }
+                },
+                label = { Text("Download folder name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Text(
+                resolvedPath,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Text(
+                "Accessible from any file manager under Android/data/",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 4.dp)
             )
 
             Spacer(Modifier.height(16.dp))

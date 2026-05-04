@@ -22,19 +22,21 @@ class AppSettingsRepository @Inject constructor(
         val KEY_DEFAULT_EMBED_THUMB   = booleanPreferencesKey("default_embed_thumbnail")
         val KEY_DEFAULT_CONCURRENT    = intPreferencesKey("default_concurrent_downloads")
         val KEY_DEFAULT_PROXY         = stringPreferencesKey("default_proxy_url")
+        val KEY_DOWNLOAD_DIR_NAME     = stringPreferencesKey("download_dir_name")
     }
 
     val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
         AppSettings(
-            syncIntervalHours         = prefs[KEY_SYNC_INTERVAL]         ?: 6,
-            wifiOnly                  = prefs[KEY_WIFI_ONLY]              ?: false,
-            requireBatteryNotLow      = prefs[KEY_REQUIRE_BATTERY]        ?: true,
-            defaultSyncMode           = prefs[KEY_DEFAULT_SYNC_MODE]      ?: "audio",
-            defaultAudioFormat        = prefs[KEY_DEFAULT_AUDIO_FORMAT]   ?: "m4a",
-            defaultVideoQuality       = prefs[KEY_DEFAULT_VIDEO_QUALITY]  ?: "best",
-            defaultEmbedThumbnail     = prefs[KEY_DEFAULT_EMBED_THUMB]    ?: true,
-            defaultConcurrentDownloads = prefs[KEY_DEFAULT_CONCURRENT]    ?: 2,
-            defaultProxyUrl           = prefs[KEY_DEFAULT_PROXY]          ?: ""
+            syncIntervalHours          = prefs[KEY_SYNC_INTERVAL]         ?: 6,
+            wifiOnly                   = prefs[KEY_WIFI_ONLY]              ?: false,
+            requireBatteryNotLow       = prefs[KEY_REQUIRE_BATTERY]        ?: true,
+            defaultSyncMode            = prefs[KEY_DEFAULT_SYNC_MODE]      ?: "audio",
+            defaultAudioFormat         = prefs[KEY_DEFAULT_AUDIO_FORMAT]   ?: "m4a",
+            defaultVideoQuality        = prefs[KEY_DEFAULT_VIDEO_QUALITY]  ?: "best",
+            defaultEmbedThumbnail      = prefs[KEY_DEFAULT_EMBED_THUMB]    ?: true,
+            defaultConcurrentDownloads = prefs[KEY_DEFAULT_CONCURRENT]     ?: 2,
+            defaultProxyUrl            = prefs[KEY_DEFAULT_PROXY]          ?: "",
+            downloadDirName            = prefs[KEY_DOWNLOAD_DIR_NAME]      ?: "PlaySync"
         )
     }
 
@@ -52,6 +54,7 @@ class AppSettingsRepository @Inject constructor(
             prefs[KEY_DEFAULT_EMBED_THUMB]   = updated.defaultEmbedThumbnail
             prefs[KEY_DEFAULT_CONCURRENT]    = updated.defaultConcurrentDownloads
             prefs[KEY_DEFAULT_PROXY]         = updated.defaultProxyUrl
+            prefs[KEY_DOWNLOAD_DIR_NAME]     = updated.downloadDirName
         }
     }
 }

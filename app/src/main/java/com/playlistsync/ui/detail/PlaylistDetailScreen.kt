@@ -181,27 +181,38 @@ private fun VideoRow(video: VideoEntity, onRetry: () -> Unit) {
 
 @Composable
 private fun StatusRow(video: VideoEntity, onRetry: () -> Unit) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val (label, color) = when (video.status) {
-            "downloaded"  -> "Downloaded"  to StatusDownloaded
-            "downloading" -> "Downloading ${video.downloadProgress}%" to StatusDownloading
-            "error"       -> "Error"       to MaterialTheme.colorScheme.error
-            "skipped"     -> "Skipped"     to MaterialTheme.colorScheme.onSurfaceVariant
-            else          -> "Pending"     to StatusPending
-        }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = color)
-
-        if (video.status == "error") {
-            TextButton(
-                onClick = onRetry,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                modifier = Modifier.height(20.dp)
-            ) {
-                Text("Retry", style = MaterialTheme.typography.labelSmall)
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val (label, color) = when (video.status) {
+                "downloaded"  -> "Downloaded"  to StatusDownloaded
+                "downloading" -> "Downloading ${video.downloadProgress}%" to StatusDownloading
+                "error"       -> "Error"       to MaterialTheme.colorScheme.error
+                "skipped"     -> "Skipped"     to MaterialTheme.colorScheme.onSurfaceVariant
+                else          -> "Pending"     to StatusPending
             }
+            Text(label, style = MaterialTheme.typography.labelSmall, color = color)
+
+            if (video.status == "error") {
+                TextButton(
+                    onClick = onRetry,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    modifier = Modifier.height(20.dp)
+                ) {
+                    Text("Retry", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        if (video.status == "downloaded" && video.localPath != null) {
+            Text(
+                video.localPath.substringAfterLast('/'),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
         }
     }
 }
