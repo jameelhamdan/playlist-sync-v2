@@ -10,6 +10,7 @@ import com.playlistsync.ui.config.FormatConfigScreen
 import com.playlistsync.ui.detail.PlaylistDetailScreen
 import com.playlistsync.ui.playlist.AddPlaylistScreen
 import com.playlistsync.ui.playlist.PlaylistListScreen
+import com.playlistsync.ui.settings.SettingsScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -20,7 +21,8 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screen.PlaylistList.route) {
             PlaylistListScreen(
                 onAddPlaylist   = { navController.navigate(Screen.AddPlaylist.route) },
-                onPlaylistClick = { id -> navController.navigate(Screen.Detail.withId(id)) }
+                onPlaylistClick = { id -> navController.navigate(Screen.Detail.withId(id)) },
+                onSettings      = { navController.navigate(Screen.Settings.route) }
             )
         }
 
@@ -31,13 +33,17 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
+        composable(Screen.Settings.route) {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(
             route = Screen.Detail.route,
             arguments = listOf(navArgument(Screen.Detail.ARG) { type = NavType.StringType })
         ) {
             PlaylistDetailScreen(
-                onBack          = { navController.popBackStack() },
-                onFormatConfig  = { id -> navController.navigate(Screen.FormatConfig.withId(id)) }
+                onBack         = { navController.popBackStack() },
+                onFormatConfig = { id -> navController.navigate(Screen.FormatConfig.withId(id)) }
             )
         }
 

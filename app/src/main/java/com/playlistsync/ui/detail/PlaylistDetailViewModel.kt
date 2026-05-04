@@ -9,7 +9,6 @@ import com.playlistsync.data.model.VideoEntity
 import com.playlistsync.data.repository.PlaylistRepository
 import com.playlistsync.ui.navigation.Screen
 import com.playlistsync.worker.PlaylistSyncCheckWorker
-import com.playlistsync.worker.VideoDownloadWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,14 +33,17 @@ class PlaylistDetailViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun syncNow() {
-        val request = OneTimeWorkRequestBuilder<VideoDownloadWorker>()
-            .setInputData(workDataOf(VideoDownloadWorker.KEY_PLAYLIST_ID to playlistId))
-            .setConstraints(PlaylistSyncCheckWorker.downloadConstraints())
-            .addTag("download_$playlistId")
+        // Full sync: fetch updated metadata then start downloads
+        val request = OneTimeWorkRequestBuilder<PlaylistSyncCheckWorker>()
+            .setInputData(workDataOf(PlaylistSyncCheckWorker.KEY_PLAYLIST_ID to playlistId))
+            .setConstraints(
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            )
+            .addTag("sync_$playlistId")
             .build()
 
         workManager.enqueueUniqueWork(
-            "download_chain_$playlistId",
+            "sync_now_$playlistId",
             ExistingWorkPolicy.REPLACE,
             request
         )

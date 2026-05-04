@@ -6,6 +6,8 @@ import androidx.work.*
 import com.playlistsync.data.model.VideoEntity
 import com.playlistsync.data.repository.DownloadRepository
 import com.playlistsync.data.repository.PlaylistRepository
+import com.playlistsync.data.settings.AppSettings
+import com.playlistsync.data.settings.AppSettingsRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -15,15 +17,23 @@ class PlaylistSyncCheckWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
     private val playlistRepository: PlaylistRepository,
-    private val downloadRepository: DownloadRepository
+    private val downloadRepository: DownloadRepository,
+    private val appSettingsRepository: AppSettingsRepository
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        val playlists = playlistRepository.getAllAutoSync()
+        val specificId = inputData.getString(KEY_PLAYLIST_ID)
+        val playlists = if (specificId != null) {
+            listOfNotNull(playlistRepository.getById(specificId))
+        } else {
+            playlistRepository.getAllAutoSync()
+        }
 
         playlists.forEach { playlist ->
             try {
-                val metadata = downloadRepository.fetchPlaylistMetadata(playlist.url, playlist.config.proxyUrl)
+                val metadata = downloadRepository.fetchPlaylistMetadata(
+                    playlist.url, playlist.config.proxyUrl
+                )
                 val knownIds = playlistRepository.getKnownYtIds(playlist.id).toSet()
 
                 val newVideos = metadata.entries
@@ -49,8 +59,8 @@ class PlaylistSyncCheckWorker @AssistedInject constructor(
                     )
                 )
 
-                if (newVideos.isNotEmpty()) {
-                    enqueueDownloadChain(playlist.id, playlist.config.maxConcurrentDownloads)
+                if (newVideos.isNotEmpty() || playlistRepository.hasPendingVideos(playlist.id)) {
+                    enqueueDownloadSlots(playlist.id, playlist.config.maxConcurrentDownloads)
                 }
             } catch (_: Exception) {
                 // Continue with remaining playlists if one fails
@@ -59,7 +69,8 @@ class PlaylistSyncCheckWorker @AssistedInject constructor(
         return Result.success()
     }
 
-    private fun enqueueDownloadChain(playlistId: String, concurrency: Int) {
+    private suspend fun enqueueDownloadSlots(playlistId: String, concurrency: Int) {
+        val settings = appSettingsRepository.getSettings()
         val wm = WorkManager.getInstance(applicationContext)
         repeat(concurrency) { slot ->
             val request = OneTimeWorkRequestBuilder<VideoDownloadWorker>()
@@ -67,35 +78,43 @@ class PlaylistSyncCheckWorker @AssistedInject constructor(
                     VideoDownloadWorker.KEY_PLAYLIST_ID to playlistId,
                     VideoDownloadWorker.KEY_SLOT to slot
                 ))
-                .setConstraints(downloadConstraints())
+                .setConstraints(downloadConstraints(settings))
                 .addTag("download_$playlistId")
                 .build()
             wm.enqueueUniqueWork(
                 "download_${playlistId}_slot_$slot",
-                ExistingWorkPolicy.KEEP, // Don't restart an already-running slot
+                ExistingWorkPolicy.KEEP,
                 request
             )
         }
     }
 
     companion object {
-        const val WORK_NAME = "playlist_sync_check"
+        const val WORK_NAME       = "playlist_sync_check"
+        const val KEY_PLAYLIST_ID = "playlist_id"
 
-        fun buildPeriodicRequest(): PeriodicWorkRequest =
-            PeriodicWorkRequestBuilder<PlaylistSyncCheckWorker>(6, TimeUnit.HOURS)
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .setRequiresBatteryNotLow(true)
-                        .build()
-                )
+        fun buildPeriodicRequest(settings: AppSettings = AppSettings()): PeriodicWorkRequest =
+            PeriodicWorkRequestBuilder<PlaylistSyncCheckWorker>(
+                settings.syncIntervalHours.toLong(), TimeUnit.HOURS
+            )
+                .setConstraints(buildConstraints(settings))
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
                 .addTag(WORK_NAME)
                 .build()
 
-        fun downloadConstraints(): Constraints =
+        fun buildConstraints(settings: AppSettings = AppSettings()): Constraints =
             Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiredNetworkType(
+                    if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+                )
+                .setRequiresBatteryNotLow(settings.requireBatteryNotLow)
+                .build()
+
+        fun downloadConstraints(settings: AppSettings = AppSettings()): Constraints =
+            Constraints.Builder()
+                .setRequiredNetworkType(
+                    if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+                )
                 .build()
     }
 }

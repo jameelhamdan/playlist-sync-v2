@@ -3,6 +3,7 @@ package com.playlistsync.ui.navigation
 sealed class Screen(val route: String) {
     object PlaylistList : Screen("playlist_list")
     object AddPlaylist  : Screen("add_playlist")
+    object Settings     : Screen("settings")
 
     object Detail : Screen("playlist_detail/{playlistId}") {
         fun withId(id: String) = "playlist_detail/$id"

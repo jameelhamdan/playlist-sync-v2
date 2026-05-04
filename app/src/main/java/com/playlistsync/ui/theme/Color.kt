@@ -2,15 +2,17 @@ package com.playlistsync.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80  = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80    = Color(0xFFEFB8C8)
+// Brand palette — vivid blue-indigo
+val Brand80  = Color(0xFF8C9EFF)   // Indigo A100
+val BrandSec80 = Color(0xFF80D8FF) // Light Blue A100
+val BrandTer80 = Color(0xFFA7FFEB) // Teal A100
 
-val Purple40  = Color(0xFF6650A4)
-val PurpleGrey40 = Color(0xFF625B71)
-val Pink40    = Color(0xFF7D5260)
+val Brand40  = Color(0xFF3D5AFE)   // Indigo A400
+val BrandSec40 = Color(0xFF00B0FF) // Light Blue A400
+val BrandTer40 = Color(0xFF00BFA5) // Teal A700
 
-val StatusDownloaded = Color(0xFF4CAF50)
-val StatusError      = Color(0xFFF44336)
-val StatusPending    = Color(0xFF9E9E9E)
-val StatusDownloading = Color(0xFF2196F3)
+// Status colors
+val StatusDownloaded  = Color(0xFF00C853) // Green A700
+val StatusError       = Color(0xFFFF1744) // Red A400
+val StatusPending     = Color(0xFF78909C)
+val StatusDownloading = Color(0xFF2979FF) // Blue A400

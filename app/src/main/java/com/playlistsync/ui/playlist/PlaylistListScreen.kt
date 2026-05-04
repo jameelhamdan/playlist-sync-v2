@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ScheduleSend
 import androidx.compose.material.icons.filled.*
@@ -11,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,13 +28,21 @@ import com.playlistsync.ui.theme.StatusPending
 fun PlaylistListScreen(
     onAddPlaylist: () -> Unit,
     onPlaylistClick: (String) -> Unit,
+    onSettings: () -> Unit,
     viewModel: PlaylistListViewModel = hiltViewModel()
 ) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("PlaylistSync") })
+            TopAppBar(
+                title = { Text("PlaySync") },
+                actions = {
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddPlaylist) {
@@ -41,7 +52,9 @@ fun PlaylistListScreen(
     ) { padding ->
         if (playlists.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -51,8 +64,8 @@ fun PlaylistListScreen(
                     Icon(
                         Icons.Default.LibraryMusic,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        modifier = Modifier.size(72.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                     )
                     Text(
                         "No playlists yet",
@@ -116,7 +129,8 @@ private fun PlaylistRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -125,12 +139,18 @@ private fun PlaylistRow(
             AsyncImage(
                 model = playlist.thumbnailUrl.ifEmpty { null },
                 contentDescription = null,
-                modifier = Modifier.size(60.dp)
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp))
             )
 
             Spacer(Modifier.width(12.dp))
 
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = playlist.name,
                     style = MaterialTheme.typography.titleSmall,
@@ -159,7 +179,20 @@ private fun PlaylistRow(
                         color = if (allDone) StatusDownloaded else StatusPending
                     )
                 }
+                if (playlist.videoCount > 0) {
+                    LinearProgressIndicator(
+                        progress = { playlist.downloadedCount.toFloat() / playlist.videoCount },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = StatusDownloaded,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
             }
+
+            Spacer(Modifier.width(4.dp))
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(onClick = onSyncNow, modifier = Modifier.size(36.dp)) {

@@ -11,6 +11,7 @@ import androidx.work.*
 import com.playlistsync.R
 import com.playlistsync.data.repository.DownloadRepository
 import com.playlistsync.data.repository.PlaylistRepository
+import com.playlistsync.data.settings.AppSettingsRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.File
@@ -20,7 +21,8 @@ class VideoDownloadWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
     private val playlistRepository: PlaylistRepository,
-    private val downloadRepository: DownloadRepository
+    private val downloadRepository: DownloadRepository,
+    private val appSettingsRepository: AppSettingsRepository
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
@@ -32,7 +34,7 @@ class VideoDownloadWorker @AssistedInject constructor(
         val playlist = playlistRepository.getById(playlistId) ?: return Result.failure()
 
         val video = playlistRepository.claimNextPendingVideo(playlistId)
-            ?: return Result.success() // No work left for this slot
+            ?: return Result.success()
 
         setForeground(buildForegroundInfo("Downloading: ${video.title}", 0))
 
@@ -71,7 +73,6 @@ class VideoDownloadWorker @AssistedInject constructor(
             val downloadedCount = playlistRepository.countDownloaded(playlistId)
             playlistRepository.updateSyncState(playlistId, System.currentTimeMillis(), downloadedCount)
 
-            // Re-enqueue this slot if more videos remain
             if (playlistRepository.hasPendingVideos(playlistId)) {
                 enqueueSlot(playlistId, slot)
             }
@@ -84,7 +85,6 @@ class VideoDownloadWorker @AssistedInject constructor(
                 progress = 0,
                 errorMessage = e.message
             )
-            // Re-enqueue to continue with remaining videos even after a failure
             if (playlistRepository.hasPendingVideos(playlistId)) {
                 enqueueSlot(playlistId, slot)
             }
@@ -92,13 +92,14 @@ class VideoDownloadWorker @AssistedInject constructor(
         }
     }
 
-    private fun enqueueSlot(playlistId: String, slot: Int) {
+    private suspend fun enqueueSlot(playlistId: String, slot: Int) {
+        val settings = appSettingsRepository.getSettings()
         val request = OneTimeWorkRequestBuilder<VideoDownloadWorker>()
             .setInputData(workDataOf(
                 KEY_PLAYLIST_ID to playlistId,
                 KEY_SLOT to slot
             ))
-            .setConstraints(PlaylistSyncCheckWorker.downloadConstraints())
+            .setConstraints(PlaylistSyncCheckWorker.downloadConstraints(settings))
             .addTag("download_$playlistId")
             .build()
         WorkManager.getInstance(applicationContext)
@@ -112,7 +113,7 @@ class VideoDownloadWorker @AssistedInject constructor(
     private fun buildForegroundInfo(title: String, progress: Int): ForegroundInfo {
         ensureNotificationChannel()
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("PlaylistSync")
+            .setContentTitle("PlaySync")
             .setContentText(title)
             .setSmallIcon(R.drawable.ic_download)
             .setProgress(100, progress, progress == 0)
@@ -147,7 +148,7 @@ class VideoDownloadWorker @AssistedInject constructor(
     companion object {
         const val KEY_PLAYLIST_ID = "playlist_id"
         const val KEY_SLOT        = "slot"
-        const val CHANNEL_ID      = "playlist_sync_downloads"
+        const val CHANNEL_ID      = "playsync_downloads"
         const val NOTIFICATION_ID = 1001
     }
 }
