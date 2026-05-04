@@ -1,0 +1,26 @@
+# Local configuration — never commit
+local.properties
+
+# Build outputs
+build/
+app/build/
+**/build/
+
+# Gradle caches and wrapper internals
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Android generated
+gen/
+out/
+
+# Signing keys — never commit
+*.jks
+*.keystore
