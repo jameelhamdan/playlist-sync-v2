@@ -6,9 +6,8 @@ build/
 app/build/
 **/build/
 
-# Gradle caches and wrapper internals
+# Gradle caches
 .gradle/
-gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .idea/
