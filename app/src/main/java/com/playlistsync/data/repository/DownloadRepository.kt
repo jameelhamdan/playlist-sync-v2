@@ -6,7 +6,6 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,48 +37,12 @@ class DownloadRepository @Inject constructor() {
                 addOption("--no-warnings")
                 addOption("--socket-timeout", "30")
                 addOption("--retries", "5")
-                // Use Android + web clients to avoid login-required errors on public content
-                addOption("--extractor-args", "youtube:player_client=android,web")
+                addOption("--extractor-args", "youtube:player_client=ios,web")
                 if (proxyUrl.isNotBlank()) addOption("--proxy", proxyUrl)
             }
             val result = YoutubeDL.getInstance().execute(request, null, null)
             parsePlaylistJson(result.out, url)
         }
-
-    private fun parsePlaylistJson(json: String, fallbackUrl: String): PlaylistMetadata {
-        val root = JSONObject(json)
-        val id = root.optString("id", extractPlaylistId(fallbackUrl))
-        val title = root.optString("title", "Unknown Playlist")
-        val channelName = root.optString("uploader", root.optString("channel", ""))
-        val thumbnailUrl = root.optString("thumbnail", "")
-
-        val entries = mutableListOf<VideoMetadata>()
-        val entriesArray = root.optJSONArray("entries")
-        if (entriesArray != null) {
-            for (i in 0 until entriesArray.length()) {
-                val entry = entriesArray.optJSONObject(i) ?: continue
-                val ytId = entry.optString("id", "")
-                if (ytId.isEmpty()) continue
-                entries.add(
-                    VideoMetadata(
-                        ytId = ytId,
-                        title = entry.optString("title", "Untitled"),
-                        duration = entry.optLong("duration", 0L),
-                        thumbnailUrl = entry.optString("thumbnail", ""),
-                        playlistIndex = i
-                    )
-                )
-            }
-        }
-
-        return PlaylistMetadata(
-            id = id,
-            title = title,
-            channelName = channelName,
-            thumbnailUrl = thumbnailUrl,
-            entries = entries
-        )
-    }
 
     suspend fun downloadVideo(
         videoUrl: String,
@@ -102,8 +65,7 @@ class DownloadRepository @Inject constructor() {
             addOption("--retries", "5")
             addOption("--fragment-retries", "5")
             addOption("--socket-timeout", "30")
-            // Use Android + web clients to avoid login-required errors on public content
-            addOption("--extractor-args", "youtube:player_client=android,web")
+            addOption("--extractor-args", "youtube:player_client=ios,web")
 
             if (config.proxyUrl.isNotBlank()) addOption("--proxy", config.proxyUrl)
 
@@ -167,41 +129,117 @@ class DownloadRepository @Inject constructor() {
                 ?: YoutubeDL.UpdateStatus.ALREADY_UP_TO_DATE
         }
 
-    // yt-dlp parses --postprocessor-args with shlex, so values with spaces need single-quoting.
-    // We strip single-quotes from names to avoid escaping complexity.
-    private fun buildAudioMetadataArgs(channelName: String, playlistName: String, trackNumber: Int): String? {
-        val parts = mutableListOf<String>()
-        if (channelName.isNotBlank()) {
-            val safe = channelName.replace("'", "")
-            parts += "-metadata 'album_artist=$safe'"
-        }
-        if (playlistName.isNotBlank()) {
-            val safe = playlistName.replace("'", "")
-            parts += "-metadata 'album=$safe'"
-        }
-        if (trackNumber > 0) parts += "-metadata track=$trackNumber"
-        return if (parts.isEmpty()) null else "ffmpeg:${parts.joinToString(" ")}"
-    }
+    companion object {
+        internal data class DownloadArgs(
+            val formatString: String,
+            val extractAudio: Boolean,
+            val audioFormat: String,
+            val audioQuality: String,
+            val embedThumbnail: Boolean,
+            val addMetadata: Boolean,
+            val metadataPostprocessorArgs: String?,
+            val mergeOutputFormat: String,
+            val embedSubs: Boolean,
+            val useAria2c: Boolean,
+            val extraArgs: List<String>
+        )
 
-    private fun buildFormatString(config: PlaylistConfig): String {
-        if (config.formatString.isNotBlank()) return config.formatString
-        return if (config.syncMode == "audio") {
-            // No ext restriction — let -x + --audio-format convert to the desired codec.
-            // Restricting to [ext=m4a] fails when YouTube only serves opus/webm streams.
-            "bestaudio/best"
-        } else {
-            val h = config.qualityPreset.removeSuffix("p")
-            when (h) {
-                "1080" -> "bestvideo[height<=1080]+bestaudio/bestvideo[height<=1080]/best[height<=1080]/best"
-                "720"  -> "bestvideo[height<=720]+bestaudio/bestvideo[height<=720]/best[height<=720]/best"
-                "480"  -> "bestvideo[height<=480]+bestaudio/bestvideo[height<=480]/best[height<=480]/best"
-                "360"  -> "bestvideo[height<=360]+bestaudio/bestvideo[height<=360]/best[height<=360]/best"
-                else   -> "bestvideo+bestaudio/best"
+        internal fun buildDownloadArgs(
+            config: PlaylistConfig,
+            channelName: String = "",
+            playlistName: String = "",
+            trackNumber: Int = 0
+        ): DownloadArgs {
+            val isAudio = config.syncMode == "audio"
+            return DownloadArgs(
+                formatString = buildFormatString(config),
+                extractAudio = isAudio,
+                audioFormat = config.audioFormat,
+                audioQuality = "0",
+                embedThumbnail = isAudio && config.embedThumbnail &&
+                    config.audioFormat in listOf("m4a", "opus", "flac", "wav"),
+                addMetadata = isAudio,
+                metadataPostprocessorArgs = if (isAudio)
+                    buildAudioMetadataArgs(channelName, playlistName, trackNumber)
+                else null,
+                mergeOutputFormat = config.videoContainer,
+                embedSubs = !isAudio && config.embedSubs,
+                useAria2c = config.useAria2c,
+                extraArgs = if (config.extraArgs.isBlank()) emptyList()
+                    else config.extraArgs.trim().split("\\s+".toRegex())
+            )
+        }
+        // yt-dlp parses --postprocessor-args with shlex, so values with spaces need single-quoting.
+        // We strip single-quotes from names to avoid escaping complexity.
+        internal fun buildAudioMetadataArgs(channelName: String, playlistName: String, trackNumber: Int): String? {
+            val parts = mutableListOf<String>()
+            if (channelName.isNotBlank()) {
+                val safe = channelName.replace("'", "")
+                parts += "-metadata 'album_artist=$safe'"
+            }
+            if (playlistName.isNotBlank()) {
+                val safe = playlistName.replace("'", "")
+                parts += "-metadata 'album=$safe'"
+            }
+            if (trackNumber > 0) parts += "-metadata track=$trackNumber"
+            return if (parts.isEmpty()) null else "ffmpeg:${parts.joinToString(" ")}"
+        }
+
+        internal fun buildFormatString(config: PlaylistConfig): String {
+            if (config.formatString.isNotBlank()) return config.formatString
+            return if (config.syncMode == "audio") {
+                // No ext restriction — let -x + --audio-format convert to the desired codec.
+                // Restricting to [ext=m4a] fails when YouTube only serves opus/webm streams.
+                "bestaudio/best"
+            } else {
+                val h = config.qualityPreset.removeSuffix("p")
+                when (h) {
+                    "1080" -> "bestvideo[height<=1080]+bestaudio/bestvideo[height<=1080]/best[height<=1080]/best"
+                    "720"  -> "bestvideo[height<=720]+bestaudio/bestvideo[height<=720]/best[height<=720]/best"
+                    "480"  -> "bestvideo[height<=480]+bestaudio/bestvideo[height<=480]/best[height<=480]/best"
+                    "360"  -> "bestvideo[height<=360]+bestaudio/bestvideo[height<=360]/best[height<=360]/best"
+                    else   -> "bestvideo+bestaudio/best"
+                }
             }
         }
-    }
 
-    private fun extractPlaylistId(url: String): String =
-        Regex("[?&]list=([A-Za-z0-9_-]+)").find(url)?.groupValues?.get(1)
-            ?: url.hashCode().toString()
+        internal fun extractPlaylistId(url: String): String =
+            Regex("[?&]list=([A-Za-z0-9_-]+)").find(url)?.groupValues?.get(1)
+                ?: url.hashCode().toString()
+
+        internal fun parsePlaylistJson(json: String, fallbackUrl: String): PlaylistMetadata {
+            val root = org.json.JSONObject(json)
+            val id = root.optString("id", extractPlaylistId(fallbackUrl))
+            val title = root.optString("title", "Unknown Playlist")
+            val channelName = root.optString("uploader", root.optString("channel", ""))
+            val thumbnailUrl = root.optString("thumbnail", "")
+
+            val entries = mutableListOf<VideoMetadata>()
+            val entriesArray = root.optJSONArray("entries")
+            if (entriesArray != null) {
+                for (i in 0 until entriesArray.length()) {
+                    val entry = entriesArray.optJSONObject(i) ?: continue
+                    val ytId = entry.optString("id", "")
+                    if (ytId.isEmpty()) continue
+                    entries.add(
+                        VideoMetadata(
+                            ytId = ytId,
+                            title = entry.optString("title", "Untitled"),
+                            duration = entry.optLong("duration", 0L),
+                            thumbnailUrl = entry.optString("thumbnail", ""),
+                            playlistIndex = i
+                        )
+                    )
+                }
+            }
+
+            return PlaylistMetadata(
+                id = id,
+                title = title,
+                channelName = channelName,
+                thumbnailUrl = thumbnailUrl,
+                entries = entries
+            )
+        }
+    }
 }

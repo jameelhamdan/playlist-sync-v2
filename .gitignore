@@ -23,3 +23,6 @@ out/
 # Signing keys — never commit
 *.jks
 *.keystore
+
+# Test run artifacts
+results/

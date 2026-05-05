@@ -30,15 +30,14 @@ jobs:
           VERSION=$(grep 'versionName' app/build.gradle.kts | sed 's/.*versionName = "\(.*\)"/\1/')
           echo "name=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Upload APK to rolling release
+      - name: Upload APK as versioned release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
+          tag_name: v${{ steps.version.outputs.name }}
           name: "PlaySync v${{ steps.version.outputs.name }}"
           body: |
             **PlaySync v${{ steps.version.outputs.name }}** — debug build
 
             Branch: `${{ github.ref_name }}`
             Commit: `${{ github.sha }}`
-          prerelease: true
           files: app/build/outputs/apk/debug/app-debug.apk
