@@ -14,7 +14,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.playlistsync.data.settings.AppSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,6 +22,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val s by viewModel.settings.collectAsStateWithLifecycle()
+    val ytDlp by viewModel.ytDlpState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     Scaffold(
@@ -50,10 +50,10 @@ fun SettingsScreen(
 
             SettingsDropdown(
                 label = "Sync interval",
-                options = listOf(1, 2, 6, 12, 24),
+                options = listOf("1", "2", "6", "12", "24"),
                 optionLabels = listOf("1 hour", "2 hours", "6 hours", "12 hours", "24 hours"),
-                selected = s.syncIntervalHours,
-                onSelected = { v -> viewModel.update { it.copy(syncIntervalHours = v) } }
+                selected = s.syncIntervalHours.toString(),
+                onSelected = { v -> viewModel.update { it.copy(syncIntervalHours = v.toInt()) } }
             )
 
             SwitchPrefRow(
@@ -89,7 +89,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
 
             if (s.defaultSyncMode == "audio") {
-                SettingsStringDropdown(
+                SettingsDropdown(
                     label = "Default audio format",
                     options = listOf("m4a", "mp3", "opus", "flac", "wav"),
                     optionLabels = listOf("M4A (recommended)", "MP3", "Opus", "FLAC", "WAV"),
@@ -97,7 +97,7 @@ fun SettingsScreen(
                     onSelected = { v -> viewModel.update { it.copy(defaultAudioFormat = v) } }
                 )
             } else {
-                SettingsStringDropdown(
+                SettingsDropdown(
                     label = "Default video quality",
                     options = listOf("best", "1080p", "720p", "480p", "360p"),
                     optionLabels = listOf("Best available", "1080p", "720p", "480p", "360p"),
@@ -115,10 +115,10 @@ fun SettingsScreen(
 
             SettingsDropdown(
                 label = "Parallel downloads",
-                options = listOf(1, 2, 3, 4, 5),
+                options = listOf("1", "2", "3", "4", "5"),
                 optionLabels = listOf("1 (sequential)", "2", "3", "4", "5"),
-                selected = s.defaultConcurrentDownloads,
-                onSelected = { v -> viewModel.update { it.copy(defaultConcurrentDownloads = v) } }
+                selected = s.defaultConcurrentDownloads.toString(),
+                onSelected = { v -> viewModel.update { it.copy(defaultConcurrentDownloads = v.toInt()) } }
             )
 
             OutlinedTextField(
@@ -161,7 +161,47 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
 
+            Spacer(Modifier.height(8.dp))
+            SectionHeader("yt-dlp")
+
+            YtDlpUpdateRow(state = ytDlp, onUpdate = { viewModel.updateYtDlp() })
+
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun YtDlpUpdateRow(state: YtDlpState, onUpdate: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text("Version", style = MaterialTheme.typography.bodyMedium)
+            val subtitle = when (state.status) {
+                YtDlpUpdateStatus.IDLE     -> state.currentVersion.ifBlank { "unknown" }
+                YtDlpUpdateStatus.UPDATING -> "Updating…"
+                YtDlpUpdateStatus.DONE     ->
+                    if (state.updatedVersion.isNotBlank()) "Updated to ${state.updatedVersion}"
+                    else "${state.currentVersion} (already up to date)"
+                YtDlpUpdateStatus.ERROR    -> "Error: ${state.error}"
+            }
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = when (state.status) {
+                    YtDlpUpdateStatus.ERROR -> MaterialTheme.colorScheme.error
+                    YtDlpUpdateStatus.DONE  -> MaterialTheme.colorScheme.primary
+                    else                    -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+        if (state.status == YtDlpUpdateStatus.UPDATING) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        } else {
+            OutlinedButton(onClick = onUpdate) { Text("Update") }
         }
     }
 }
@@ -181,23 +221,13 @@ private fun SwitchPrefRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 12.dp)
-        ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
@@ -206,41 +236,6 @@ private fun SwitchPrefRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsDropdown(
-    label: String,
-    options: List<Int>,
-    optionLabels: List<String>,
-    selected: Int,
-    onSelected: (Int) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = optionLabels.getOrElse(options.indexOf(selected)) { selected.toString() }
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        OutlinedTextField(
-            value = selectedLabel,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.zip(optionLabels).forEach { (option, optLabel) ->
-                DropdownMenuItem(
-                    text = { Text(optLabel) },
-                    onClick = { onSelected(option); expanded = false }
-                )
-            }
-        }
-    }
-    Spacer(Modifier.height(8.dp))
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SettingsStringDropdown(
     label: String,
     options: List<String>,
     optionLabels: List<String>,
@@ -257,9 +252,7 @@ private fun SettingsStringDropdown(
             readOnly = true,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
+            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.zip(optionLabels).forEach { (option, optLabel) ->

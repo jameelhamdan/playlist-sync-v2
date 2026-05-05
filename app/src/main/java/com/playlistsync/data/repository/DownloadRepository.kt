@@ -140,10 +140,13 @@ class DownloadRepository @Inject constructor() {
         YoutubeDL.getInstance().destroyProcessById(processId)
     }
 
-    suspend fun updateYtDlp(context: Context): YoutubeDL.UpdateStatus =
+    fun getVersion(context: Context): String =
+        YoutubeDL.getInstance().version(context) ?: "unknown"
+
+    suspend fun updateYtDlp(context: Context): Boolean =
         withContext(Dispatchers.IO) {
-            YoutubeDL.getInstance().updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
-                ?: YoutubeDL.UpdateStatus.ALREADY_UP_TO_DATE
+            YoutubeDL.getInstance().updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE) ==
+                YoutubeDL.UpdateStatus.DONE
         }
 
     companion object {
