@@ -64,4 +64,7 @@ class PlaylistRepository @Inject constructor(
 
     suspend fun hasPendingVideos(playlistId: String) =
         videoDao.countPendingOrError(playlistId) > 0
+
+    suspend fun hasOnlyPendingVideos(playlistId: String) =
+        videoDao.countPendingOnly(playlistId) > 0
 }

@@ -83,13 +83,21 @@ class VideoDownloadWorker @AssistedInject constructor(
 
             Result.success()
         } catch (e: Exception) {
+            val fullError = buildString {
+                append(e.toString())
+                var cause = e.cause
+                while (cause != null) {
+                    append("\nCaused by: $cause")
+                    cause = cause.cause
+                }
+            }
             playlistRepository.updateVideoDownloadState(
                 id = video.id,
                 status = "error",
                 progress = 0,
-                errorMessage = e.message
+                errorMessage = fullError
             )
-            if (playlistRepository.hasPendingVideos(playlistId)) {
+            if (playlistRepository.hasOnlyPendingVideos(playlistId)) {
                 enqueueSlot(playlistId, slot)
             }
             Result.success()

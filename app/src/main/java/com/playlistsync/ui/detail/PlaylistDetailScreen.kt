@@ -150,9 +150,7 @@ private fun VideoRow(video: VideoEntity, onRetry: () -> Unit) {
                         Text(
                             video.errorMessage,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }

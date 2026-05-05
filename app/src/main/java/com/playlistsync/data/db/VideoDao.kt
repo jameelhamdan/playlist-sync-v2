@@ -30,6 +30,9 @@ abstract class VideoDao {
     @Query("SELECT COUNT(*) FROM videos WHERE playlistId = :playlistId AND status IN ('pending', 'error')")
     abstract suspend fun countPendingOrError(playlistId: String): Int
 
+    @Query("SELECT COUNT(*) FROM videos WHERE playlistId = :playlistId AND status = 'pending'")
+    abstract suspend fun countPendingOnly(playlistId: String): Int
+
     @Query("SELECT ytId FROM videos WHERE playlistId = :playlistId")
     abstract suspend fun getKnownYtIds(playlistId: String): List<String>
 
