@@ -14,8 +14,9 @@ android {
         applicationId = "com.jhamdan.playsync"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.4.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -78,4 +79,12 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.datastore.prefs)
     implementation(libs.coil.compose)
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

@@ -17,6 +17,15 @@ class PlaylistSyncApp : Application(), Configuration.Provider {
         super.onCreate()
         YoutubeDL.getInstance().init(this)
         FFmpeg.getInstance().init(this)
+        updateYtDlpAsync()
+    }
+
+    private fun updateYtDlpAsync() {
+        Thread {
+            try {
+                YoutubeDL.getInstance().updateYoutubeDL(this, YoutubeDL.UpdateChannel.STABLE)
+            } catch (_: Exception) {}
+        }.start()
     }
 
     override val workManagerConfiguration: Configuration

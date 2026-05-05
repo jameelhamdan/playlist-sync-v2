@@ -108,37 +108,11 @@ class AddPlaylistViewModel @Inject constructor(
         viewModelScope.launch {
             val settings = appSettingsRepository.getSettings()
 
-            val entity = PlaylistEntity(
-                id = meta.id,
-                url = urlInput.value.trim(),
-                name = meta.title,
-                thumbnailUrl = meta.thumbnailUrl,
-                channelName = meta.channelName,
-                videoCount = meta.entries.size,
-                config = PlaylistConfig(
-                    syncMode = preview.syncMode,
-                    audioFormat = preview.audioFormat,
-                    qualityPreset = preview.videoQuality,
-                    embedThumbnail = settings.defaultEmbedThumbnail,
-                    maxConcurrentDownloads = settings.defaultConcurrentDownloads,
-                    proxyUrl = settings.defaultProxyUrl
-                )
-            )
+            val entity = buildPlaylistEntity(urlInput.value.trim(), meta, preview, settings)
             playlistRepository.save(entity)
 
             // Insert all fetched video metadata immediately so they appear right away
-            val videoEntities = meta.entries.map { entry ->
-                VideoEntity(
-                    id = "${entity.id}/${entry.ytId}",
-                    playlistId = entity.id,
-                    ytId = entry.ytId,
-                    title = entry.title,
-                    duration = entry.duration,
-                    thumbnailUrl = entry.thumbnailUrl,
-                    playlistIndex = entry.playlistIndex,
-                    status = "pending"
-                )
-            }
+            val videoEntities = buildVideoEntities(meta, entity.id)
             playlistRepository.insertVideos(videoEntities)
 
             // Start download slots immediately
@@ -172,5 +146,45 @@ class AddPlaylistViewModel @Inject constructor(
     fun resetState() {
         _uiState.value = AddPlaylistUiState.Idle
         fetchedMetadata = null
+    }
+
+    companion object {
+        internal fun buildPlaylistEntity(
+            url: String,
+            meta: com.playlistsync.data.repository.PlaylistMetadata,
+            preview: AddPlaylistUiState.Preview,
+            settings: com.playlistsync.data.settings.AppSettings
+        ): PlaylistEntity = PlaylistEntity(
+            id = meta.id,
+            url = url,
+            name = meta.title,
+            thumbnailUrl = meta.thumbnailUrl,
+            channelName = meta.channelName,
+            videoCount = meta.entries.size,
+            config = PlaylistConfig(
+                syncMode = preview.syncMode,
+                audioFormat = preview.audioFormat,
+                qualityPreset = preview.videoQuality,
+                embedThumbnail = settings.defaultEmbedThumbnail,
+                maxConcurrentDownloads = settings.defaultConcurrentDownloads,
+                proxyUrl = settings.defaultProxyUrl
+            )
+        )
+
+        internal fun buildVideoEntities(
+            meta: com.playlistsync.data.repository.PlaylistMetadata,
+            playlistId: String
+        ): List<VideoEntity> = meta.entries.map { entry ->
+            VideoEntity(
+                id = "$playlistId/${entry.ytId}",
+                playlistId = playlistId,
+                ytId = entry.ytId,
+                title = entry.title,
+                duration = entry.duration,
+                thumbnailUrl = entry.thumbnailUrl,
+                playlistIndex = entry.playlistIndex,
+                status = "pending"
+            )
+        }
     }
 }

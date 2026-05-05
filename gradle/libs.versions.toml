@@ -57,6 +57,9 @@ coroutines-android          = { group = "org.jetbrains.kotlinx",      name = "ko
 datastore-prefs             = { group = "androidx.datastore",         name = "datastore-preferences",           version.ref = "dataStore" }
 coil-compose                = { group = "io.coil-kt",                 name = "coil-compose",                    version.ref = "coil" }
 
+androidx-test-runner      = { group = "androidx.test",     name = "runner",              version = "1.6.2" }
+androidx-test-ext-junit   = { group = "androidx.test.ext", name = "junit",               version = "1.2.1" }
+
 [plugins]
 android-application         = { id = "com.android.application",              version.ref = "agp" }
 kotlin-android              = { id = "org.jetbrains.kotlin.android",          version.ref = "kotlin" }
